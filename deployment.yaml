@@ -1,0 +1,36 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+  labels:
+    app: app-v0-1-0
+  name: app-v0-1-0
+  namespace: name-qa
+spec:
+  progressDeadlineSeconds: 600
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app: app-v0-1-0
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: app-v0-1-0
+    spec:
+      containers:
+      - image: harbor.app.abc.com/com/app1:__IMG_TAG__
+        imagePullPolicy: Always
+        name: app-v0-1-0
+        ports:
+        - containerPort: 80
+          protocol: TCP
+        resources: {}
+      imagePullSecrets:
+        - name: harbor-jenkins-secret
