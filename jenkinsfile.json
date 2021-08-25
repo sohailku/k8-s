@@ -1,0 +1,4 @@
+{
+    "project_name": "abc",
+    "docker_registry": "harbor.app.abc.com"
+}
