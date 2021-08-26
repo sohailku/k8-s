@@ -1,0 +1,104 @@
+kafa-connect
+#!/usr/bin/groovy
+def appName = 'kafkaconnect'
+def timestamp = System.nanoTime()
+def podLabel = 'jenkins-' + appName + '-' + timestamp
+podTemplate(label: podLabel, containers: [
+    containerTemplate(name: 'jnlp', image: 'jenkins/jnlp-slave:3.27-1-alpine', args: '${​computer.jnlpmac}​ ${​computer.name}​', workingDir: '/home/jenkins', resourceRequestCpu: '200m', resourceLimitCpu: '300m', resourceRequestMemory: '256Mi', resourceLimitMemory: '512Mi', privileged : true),
+    containerTemplate(name: 'curl', image: 'benhall/curl:latest', workingDir: '/home/jenkins', ttyEnabled: true, command: 'cat'),
+    containerTemplate(name: 'docker', image: 'docker:dind', workingDir: '/home/jenkins', ttyEnabled: true, privileged: true),
+    containerTemplate(name: 'kubectl', image: 'dtzar/helm-kubectl:latest', workingDir: '/home/jenkins', ttyEnabled: true, command: 'cat')
+]){​
+    node (podLabel) {​
+        try {​
+                    stage('Checkout') {​
+                        ansiColor('xterm') {​
+                            println "Checkout the git repo"
+                            checkout scm
+                        }​
+                    }​
+                    def listENV = ['dev','sit','uat']
+                    def ENV = env.BRANCH_NAME
+                    if (ENV in listENV ) {​
+                            println "Loading Pipeline config"
+                            def inputFile = readFile('jenkinsfile.json')
+                            def config = new groovy.json.JsonSlurperClassic().parseText(inputFile)
+                            def filePATH = "kafkaconnect-ci/kafkaconnect-${​ENV}​.yaml"
+                            def statusDockerImage = ""
+                            def tag = ""
+                            stage ('Build and Push Docker Image') {​
+                                    if(ENV == "dev"){​
+                                        tag = "${​config.dev.kc.imageVersion}​"
+                                    }​
+                                    else if(ENV == "sit"){​
+                                        tag = "${​config.sit.kc.imageVersion}​"
+                                    }​
+                                    else{​
+                                        tag = "${​config.uat.kc.imageVersion}​"
+                                    }​
+                                    withCredentials([usernamePassword(
+                                                credentialsId: "azure-container-registry-sp",
+                                                usernameVariable: "USERNAME",
+                                                passwordVariable: "PASSWORD")
+                                            ]) {​
+                                                        container('curl') {​
+                                                            def acrCredsString = "$USERNAME:$PASSWORD"        
+                                                            statusDockerImage = sh(script: """acrCredsEncoded=`echo -n "${​acrCredsString}​" | base64`; curl -X GET -o /dev/null -s -w "%{​http_code}​\n" -s -H "Authorization: Basic \$acrCredsEncoded" https://abc.azurecr.io/v2/ec-strimzi-kconnect/manifests/${​tag}​""",
+                                                                                    returnStdout: true).trim()
+                                                        }​
+                                                        println statusDockerImage
+                                                        if(statusDockerImage == "404"){​
+                                                                container("docker"){​
+                                                                        ansiColor('xterm') {​
+                                                                            sh """
+                                                                                docker login abc.azurecr.io -u ${​USERNAME}​ -p ${​PASSWORD}​
+                                                                                docker build -t  abc.azurecr.io/ec-strimzi-kconnect:${​tag}​ -f kafkaconnect-ci/Dockerfile ./
+                                                                                docker push abc.azurecr.io/ec-strimzi-kconnect:${​tag}​
+                                                                                """
+                                                                        }​
+                                                                }​
+                                                            // container("docker"){​
+                                                            //         docker.withRegistry('https://abc.azurecr.io', 'azure-container-registry-sp') {​
+                                                            //                 def customImage = docker.build("ec-strimzi-kconnect:${​tag}​", "./kafkaconnect-ci/")
+                                                            //                 customImage.push()
+                                                            //         }​
+                                                            // }​
+                                                        }​
+                                                        else if(statusDockerImage == "200"){​
+                                                                println """The image abc.azurecr.io/ec-strimzi-kconnect:${​tag}​ already exist"""
+                                                        }​
+                                                        else{​
+                                                                throw new Exception("Could not access the abc registry")
+                                                        }​
+                                    }​
+                            }​
+                            // Update verson of Image in the Kafka Connect yaml file
+                            sh """sed -i.bak "s#__IMG_TAG__#${​tag}​#" ${​filePATH}​"""
+                            container('kubectl'){​
+                                    stage ('Validate yaml file') {​
+                                            kubeconfig(credentialsId:'DatagkubeConfig'){​
+                                                sh """
+                                                    kubectl apply --dry-run='server' -f $filePATH
+                                                """ 
+                                            }​
+                                    }​
+                                    stage ('Deploy Kafka Cluster') {​
+                                            kubeconfig(credentialsId:'DatagkubeConfig'){​
+                                                sh """
+                                                    kubectl apply --wait=true -f $filePATH
+                                                """ 
+                                            }​
+                                    }​
+                            }​
+                    }​
+        }​ catch(error) {​
+            currentBuild.result = "FAILED"
+            throw error
+        }​
+    }​
+}​
+    
+    
+  
+  
+
