@@ -1,0 +1,105 @@
+Backup and Restore a Kubernetes Cluster with Velero
+
+Velero is used as a tool of choice at Zand for backing up and restoring Kubernetes cluster resources. This article describes how to set up and use Velero.
+
+Installation
+Export the following variables in your Shell environment:
+
+
+BLOB_CONTAINER=velero
+AZURE_BACKUP_RESOURCE_GROUP=Velero_Backups
+AZURE_STORAGE_ACCOUNT_NAME=velerof6eec6939218
+AZURE_STORAGE_ACCOUNT_ACCESS_KEY=
+AZURE_BACKUP_SUBSCRIPTION_ID=
+RG=Velero_Backups
+Create a credentials file 
+
+
+# Azure credential file
+$ cat << EOF  > /tmp/credentials-velero
+AZURE_STORAGE_ACCOUNT_ACCESS_KEY=${AZURE_STORAGE_ACCOUNT_ACCESS_KEY}
+AZURE_CLOUD_NAME=AzurePublicCloud
+AZURE_TENANT_ID=
+AZURE_CLIENT_ID=
+AZURE_CLIENT_SECRET=
+AZURE_SUBSCRIPTION_ID=${AZURE_BACKUP_SUBSCRIPTION_ID}
+AZURE_RESOURCE_GROUP=
+EOF
+
+Run the installion commamd:
+
+
+
+$ velero install \
+    --provider azure \
+    --plugins velero/velero-plugin-for-microsoft-azure:v1.1.0 \
+    --bucket $BLOB_CONTAINER \
+    --secret-file /tmp/credentials-velero \
+    --backup-location-config resourceGroup=$AZURE_BACKUP_RESOURCE_GROUP,storageAccount=$AZURE_STORAGE_ACCOUNT_NAME,storageAccountKeyEnvVar=AZURE_STORAGE_ACCOUNT_ACCESS_KEY,subscriptionId=$AZURE_BACKUP_SUBSCRIPTION_ID \
+    --snapshot-location-config resourceGroup=$RG,subscriptionId=$AZURE_SUBSCRIPTION_ID \
+    --velero-pod-cpu-limit   '1G' \
+    --velero-pod-cpu-request '800m' \
+    --velero-pod-mem-limit   '1G' \
+    --velero-pod-mem-request '1G' 
+Confirm velero is installed and running by checkind the pods in velero namespace.
+
+
+Don’t forget to update the variables in the code snippets above.
+
+Make sure that the required cpu and memory can be allocated in your cluster, otherwise remove these arguments from the velero install command.
+
+ 
+
+Performing a Backup
+First, switch to the source Cluster’s context (kubectl).
+
+Run the following command to perform a backup:
+
+
+$ velero backup create  dev-backup --include-namespaces dev --wait
+Check the status of the backup:
+
+
+$ velero backup describe dev-backup 
+$ velero backup logs dev-backup
+Confirm in the Blob storage that the files have been moved by navigating to Microsoft Azure  
+
+
+Performing a Restore
+First, switch to the destination Cluster’s context (kubectl).
+
+Run the following command to perform a backup:
+
+
+$ velero restore create  dev-backup --from-backup dev-backup --wait
+Check the status of the backup:
+
+
+$ velero backup describe dev-backup 
+$ velero backup logs dev-backup
+Confirm in the Blob storage that the files have been moved by navigating to Microsoft Azure  
+
+
+Uninstalling Velero
+Remove the namespace
+
+
+$ kubectl delete ns velero
+Related items
+SUSE CaaS Platform 4.2.4: Chapter 11. Backup and Restore with Velero (Administration Guide) 
+
+Kubernetes Disaster Recovery with Velero  
+
+https://velero.io/docs/v1.1.0/troubleshooting/#getting-velero-debug-logs 
+
+https://github.com/vmware-tanzu/velero/blob/b3101e7f77f3eade2473868bc4e92d5f1245dcfe/site/docs/main/customize-installation.md#customize-resource-requests-and-limits 
+
+docker-development-youtube-series/kubernetes/velero at master · marcel-dempers/docker-development-youtube-series 
+
+How To Back Up and Restore a Kubernetes Cluster on DigitalOcean Using Velero | DigitalOcean  
+
+Velero-k8s/Azure-AKS at main · Nagendran2807/Velero-k8s  
+
+
+
+GitHub - vmware-tanzu/velero-plugin-for-microsoft-azure: Plugins to support Velero on Microsoft Azure  
