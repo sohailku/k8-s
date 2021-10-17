@@ -2,11 +2,11 @@
 def String appName = 'abc-fulfillment'
 def timestamp = System.nanoTime()
 def String podLabel = 'jenkins-' + appName + '-' + timestamp
-def String teamsWebhookUrl = 'https://abcholding.webhook.office.com/webhookb2/5c3f89d3-ca4a-45ce-8321-cf7bfd919793@a08ca1e1-56c6-4bb0-b474-5731aa41f98d/IncomingWebhook/1673473879114b3cbedcf6a61a6dda33/150a949b-9f92-47db-b0c3-f22d95312941'
+def String teamsWebhookUrl = 'https://abc.webhook.office.com/webhookb2/5c3f89d3-ca4a-45ce-8321-cf7bfd919793@a08ca1e1-56c6-4bb0-b474-5731aa41f98d/IncomingWebhook/1673473879114b3cbedcf6a61a6dda33/150a949b-9f92-47db-b0c3-f22d95312941'
 podTemplate(label: podLabel, containers: [
     containerTemplate(name: 'jnlp', image: 'jenkins/jnlp-slave:4.7-1-alpine', alwaysPullImage: false, args: '${computer.jnlpmac} ${computer.name}', workingDir: '/var/jenkins_home', resourceRequestCpu: '200m', resourceLimitCpu: '300m', resourceRequestMemory: '256Mi', resourceLimitMemory: '512Mi'),
     containerTemplate(name: 'flutter', image: 'cirrusci/flutter:2.2.3', alwaysPullImage: false, workingDir: '/var/jenkins_home', ttyEnabled: true, command: 'sh', privileged : true),
-    containerTemplate(name: 'img', image: 'harbor.app.abcmist.com/abccom/abc-buildtools:v0.1.0', ttyEnabled: true,  alwaysPullImage: true, privileged : true,  command: 'cat')
+    containerTemplate(name: 'img', image: 'harbor.app.abc.com/abccom/abc-buildtools:v0.1.0', ttyEnabled: true,  alwaysPullImage: true, privileged : true,  command: 'cat')
     ],
     volumes:[
          hostPathVolume(mountPath: '/var/run/docker.sock', hostPath: '/var/run/docker.sock'),
@@ -67,8 +67,8 @@ podTemplate(label: podLabel, containers: [
                             ansiColor('xterm') {
                                 exitCode = sh(script: """
                                     img login ${dockerUrl} -u ${USERNAME} -p ${PASSWORD}
-                                    img build -t  harbor.app.abcmist.com/abcecom/neb-fulfillment:${commitId} -f Dockerfile.qa ./
-                                    img push harbor.app.abcmist.com/abcecom/neb-fulfillment:${commitId}
+                                    img build -t  harbor.app.abc.com/abc/abc-fulfillment:${commitId} -f Dockerfile.qa ./
+                                    img push harbor.app.abc.com/abc/abc-fulfillment:${commitId}
                                 """, returnStatus: true)
                             }
                         }
@@ -112,8 +112,8 @@ podTemplate(label: podLabel, containers: [
                             ansiColor('xterm') {
                                 exitCode = sh(script: """
                                 img login ${dockerUrl} -u ${USERNAME} -p ${PASSWORD}
-                                img build -t  harbor.app.abcmist.com/abccom/neb-fulfillment:${commitId} ./
-                                img push harbor.app.abcmist.com/abccom/neb-fulfillment:${commitId}
+                                img build -t  harbor.app.abc.com/abc/abc-fulfillment:${commitId} ./
+                                img push harbor.app.abc.com/abc/abc-fulfillment:${commitId}
                             """, returnStatus: true)
                             }
                     }
