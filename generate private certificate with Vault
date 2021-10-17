@@ -1,0 +1,61 @@
+How to generate private certificate with Vault
+
+The following document explains the steps required to issue Private certificates via Vault.
+
+Install pre-requisites:
+
+
+ # Vault CLI
+ $ brew tap hashicorp/tap
+ $ brew install hashicorp/tap/vault
+
+ # Consul
+ $ brew install consul-template
+Export environment variables
+
+
+ $ export VAULT_TOKEN="xxxxxxxxxxxxxxxxxxxxx"
+ $ export VAULT_ADDR="<https://vault.abcxyz.ae">
+Confirm Vault connects:
+
+
+ $ vault status
+Create a file prod.hcl with the following content (Filename is not important). Update '<your_common_name_here>' with the required name:
+
+
+ // Example for Prod //
+ vault {
+   address = "<https://vault.abcxyz.ae">
+   namespace = "root"
+   //vault_agent_token_file = "/tmp/vtk.file"
+ }
+
+ template {
+ contents    = "{{ with secret \"pki_intermediate_ca_core/issue/generic_server_cert\" \"ttl=17520h\" \"common_name=<your_common_name_here>  \" }}{{ .Data.certificate }}{{ end }}"
+ destination = "./<file_name>.pem"
+ }
+
+ template {
+ contents    = "{{ with secret \"pki_intermediate_ca_core/issue/generic_server_cert\" \"ttl=17520h\" \"common_name=<your_common_name_here>  \" }}{{ .Data.issuing_ca }}{{ end }}"
+ destination = "./<file_name>-ca.pem"
+ }
+
+ template {
+ contents    = "{{ with secret \"pki_intermediate_ca_core/issue/generic_server_cert\" \"ttl=17520h\" \"common_name=<your_common_name_here>  \" }}{{ .Data.private_key }}{{ end }}"
+ destination = "./<file_name>.key"
+ }
+Run the following command to create the Certificate and Key:
+
+
+ $ consul-template -config=prod.hcl -once
+Confirm files are created:
+
+
+ $ ls -l 
+You can view the ceritificate to verify its properties:
+
+
+ $ openssl x509 -in prod.pem -text
+ 
+
+Provide the .pem and .key files to requestor.
